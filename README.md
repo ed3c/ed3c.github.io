@@ -38,7 +38,8 @@ Choosing map render style.
 
 ## Unity
 #### control
-a/d for rotating view, w/s for towarding and backwarding, space for jumping up.
+a/d for rotating view, w/s for towarding and backwarding.
+space for jumping up.
 esc for setting the rising sea level.
 z/x for changing vew of camera, which can see the whole Taipei Citys sunk in the sea.
 #### feature
