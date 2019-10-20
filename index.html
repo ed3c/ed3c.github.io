@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset=utf-8 />
+<title>Add styles made with Mapbox Studio to a Leaflet map</title>
+<meta name='viewport' content='initial-scale=1,maximum-scale=1,user-scalable=no' />
+<script src='https://api.mapbox.com/mapbox.js/v3.2.0/mapbox.js'></script>
+<script src="https://unpkg.com/deck.gl@^7.0.0/dist.min.js"></script>
+<link href='https://api.mapbox.com/mapbox.js/v3.2.0/mapbox.css' rel='stylesheet' />
+<script src='https://api.tiles.mapbox.com/mapbox-gl-js/v1.4.1/mapbox-gl.js'></script>
+<link href='https://api.tiles.mapbox.com/mapbox-gl-js/v1.4.1/mapbox-gl.css' rel='stylesheet' />
+<style>
+  body { margin:0; padding:0; }
+  #map { z-index:2; position:absolute; top:0; bottom:0; width:100%; pointer-events: none; filter:alpha(Opacity=80);-moz-opacity:0.5;opacity: 0.5;}
+  #hill { z-index:1; position:absolute; top:0; bottom:0; width:100%; pointer-events: auto; }
+  .marker {
+    display: block;
+    border: none;
+    border-radius: 50%;
+    cursor: pointer;
+    padding: 0;
+  }
+  .map-overlay {
+    z-index:3;
+    font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+    position: absolute;
+    width: 25%;
+    top: 0;
+    left: 0;
+    padding: 10px;
+}
+
+.map-overlay .map-overlay-inner {
+    background-color: #fff;
+    box-shadow:0 1px 2px rgba(0, 0, 0, 0.20);
+    border-radius: 3px;
+    padding: 10px;
+    margin-bottom: 10px;
+}
+
+.map-overlay h2 {
+    line-height: 24px;
+    display: block;
+    margin: 0 0 10px;
+}
+
+.map-overlay .legend .bar {
+    height: 10px;
+    width: 100%;
+    background: linear-gradient(to right, #FCA107, #7F3121);
+}
+
+.map-overlay input {
+    background-color: transparent;
+    display: inline-block;
+    width: 100%;
+    position: relative;
+    margin: 0;
+    cursor: ew-resize;
+}
+.listing-group {
+font: 12px/20px 'Helvetica Neue', Arial, Helvetica, sans-serif;
+font-weight: 600;
+position: absolute;
+top: 10px;
+right: 50px;
+z-index: 3;
+border-radius: 2px;
+max-width: 20%;
+color: #fff;
+}
+ 
+.listing-group input[type=checkbox]:first-child + label {
+border-radius: 3px 3px 0 0;
+}
+ 
+.listing-group label:last-child {
+border-radius: 0 0 3px 3px;
+border: none;
+}
+ 
+.listing-group input[type=checkbox] {
+display: none;
+}
+ 
+.listing-group input[type=checkbox] + label {
+background-color: #3386c0;
+display: block;
+cursor: pointer;
+padding: 5px;
+border-bottom: 1px solid rgba(0, 0, 0, 0.25);
+}
+ 
+.listing-group input[type=checkbox] + label {
+background-color: #3386c0;
+text-transform: capitalize;
+}
+ 
+.listing-group input[type=checkbox] + label:hover,
+.listing-group input[type=checkbox]:checked + label {
+background-color: #4ea0da;
+}
+ 
+.listing-group input[type=checkbox]:checked + label:before {
+content: '✔';
+margin-right: 5px;
+}
+</style>
+</head>
+<body>
+
+    
+<div id='map'></div>
+<div id='hill'></div>
+
+<div class='map-overlay top'>
+        <div class='map-overlay-inner'>
+            <h2>Sea Level <label id='meteor'>7</label> (m) <label id='age'>2175</label> y</h2>
+            <input id='slider' type='range' min='0' max='11' step='1' value='7' />
+        </div>
+    </div>
+    <nav id='listing-group' class='listing-group'>
+            <input type='checkbox' id='2015' checked='checked'>
+            <label for='2015'>2015 Population Density</label>
+            <input type='checkbox' id='2000' >
+            <label for='2000'>2000 Population Density</label>
+            <input type='checkbox' id='1990' >
+            <label for='1990'>1990 Population Density</label>
+            <input type='checkbox' id='1975' >
+            <label for='1975'>1975 Population Density</label>
+            </nav>
+
+
+<script>
+    var latitude = 30;
+    var longitude = 30;
+    var waterlevel = 7;
+
+    const {MapboxLayer, ScatterplotLayer} = deck;
+
+    var meters = [
+        '0',
+        '1',
+        '2',
+        '3',
+        '4',
+        '5',
+        '6',
+        '7',
+        '8',
+        '9',
+        '10',
+        '11'
+    ];
+
+    var age = [
+        '1995',
+        '2025',
+        '2055',
+        '2085',
+        '2115',
+        '2145',
+        '2175',
+        '2215',
+        '2245',
+        '2375',
+        '2415',
+        '2445'
+    ];
+
+    L.mapbox.accessToken = 'pk.eyJ1IjoiZWQzYyIsImEiOiJjazFpczAwYngxdGFuM2Rtdm9pNTR6MjJuIn0.IDXuSBZB_BqynarslIyeAQ';
+    var leaflet_mapbox = L.mapbox.map('map', null,{
+        fadeAnimation: false,
+        zoomControl: false,
+        attributionControl: false
+    })
+    .setView([latitude, longitude], 8)
+    //.addControl(L.mapbox.geocoderControl('mapbox.places'))
+
+    /*var overlayers = L.control.layers({
+        'Satelite': L.mapbox.styleLayer('mapbox://styles/mapbox/satellite-v9').addTo(leaflet_mapbox),
+        'Light': L.mapbox.styleLayer('mapbox://styles/mapbox/light-v10'),
+        'Population Density': L.mapbox.styleLayer('mapbox://styles/ed3c/ck1rbevhn47t51dpnmogzd5ww'),
+        'Streets': L.mapbox.styleLayer('mapbox://styles/mapbox/streets-v11')
+    }, {
+        'Flood map 7 meters': L.tileLayer(
+        'http://flood.firetree.net/solidtile/m_'+waterlevel+'/x_{x}/y_{y}/z_{z}',{
+            opacity : 0.2,
+            attribution: '&copy; <a href="http://flood.firetree.net">Firetree</a>'
+            }
+        ),
+        'Bike Stations': L.mapbox.tileLayer('examples.bike-locations'),
+        'Bike Lanes': L.mapbox.tileLayer('examples.bike-lanes')
+    }).addTo(leaflet_mapbox);*/
+    //mapbox://styles/ed3c/ck1y742q0at7a1dml7rc956nh
+    //mapbox://styles/ed3c/ck1y9ogmj2fqs1cn04o7u7x8d
+    mapboxgl.accessToken = 'pk.eyJ1IjoiZWQzYyIsImEiOiJjazFpczAwYngxdGFuM2Rtdm9pNTR6MjJuIn0.IDXuSBZB_BqynarslIyeAQ';
+    var mapbox = new mapboxgl.Map({
+        container: 'hill',
+        style: 'mapbox://styles/mapbox/cjaudgl840gn32rnrepcb9b9g', // the outdoors-v10 style but without Hillshade layers
+        center: [latitude, longitude],
+        zoom: 7
+    });
+
+    mapbox.addControl(new mapboxgl.GeolocateControl({
+        positionOptions: {
+        enableHighAccuracy: true
+        },
+        trackUserLocation: true
+    }),'top-right');
+
+    mapbox.addControl(new mapboxgl.NavigationControl(),'top-right');
+
+    var flood_layer = L.tileLayer(
+                'http://flood.firetree.net/solidtile/m_'+waterlevel+'/x_{x}/y_{y}/z_{z}',{
+                    opacity : 1,
+                    attribution: '&copy; <a href="http://flood.firetree.net">Firetree</a>'
+                    }
+                );
+
+    var overlayers = L.control.layers({
+        'Satelite': L.mapbox.styleLayer('mapbox://styles/mapbox/satellite-v9').addTo(leaflet_mapbox),
+        'Light': L.mapbox.styleLayer('mapbox://styles/mapbox/light-v10'),
+        //'Population Density': L.mapbox.styleLayer('mapbox://styles/ed3c/ck1rbevhn47t51dpnmogzd5ww'),
+        'Streets': L.mapbox.styleLayer('mapbox://styles/mapbox/streets-v11')
+    }, {
+        'Flood map': flood_layer
+    },{ position: 'bottomright' }).addTo(leaflet_mapbox);
+
+    mapbox.on('load', function () {
+        const firstLabelLayerId = mapbox.getStyle().layers.find(layer => layer.type === 'symbol').id;
+
+        mapbox.addSource('dem', {
+        "type": "raster-dem",
+        "url": "mapbox://mapbox.terrain-rgb"
+        });
+        mapbox.addLayer({
+        "id": "hillshading",
+        "source": "dem",
+        "type": "hillshade"
+        // insert below waterway-river-canal-shadow;
+        // where hillshading sits in the Mapbox Outdoors style
+        }, 'waterway-river-canal-shadow');
+
+        //https://sedac.ciesin.columbia.edu/geoserver/ows?SERVICE=WMS&request=GetMap&layers=MOD14A1_M_FIRE&style=rgb&crs=CRS:84&bbox=-180,-90,180,90&width=720&height=360&format=image/png
+
+        /*mapbox.addLayer({
+        'id': 'wms-test-layer',
+        'type': 'raster',
+        'source': {
+        'type': 'raster',
+        'tiles': [
+        'https://neo.sci.gsfc.nasa.gov/wms/wms?version=1.3.0&request=GetMap&layers=MOD14A1_M_FIRE&style=rgb&crs=CRS:84&bbox=-180,-90,180,90&width=720&height=360&format=image/png'
+        ],
+        'tileSize': 256
+        },
+        'paint': {}
+        }, 'water');*/
+
+        mapbox.addLayer(new MapboxLayer({
+        id: 'deckgl-circle',
+        type: ScatterplotLayer,
+        data: [
+          {position: [-122.402, 37.79], color: [255, 0, 0], radius: 1000}
+        ],
+        getPosition: d => d.position,
+        getColor: d => d.color,
+        getRadius: d => d.radius,
+        opacity: 0.1
+      }), firstLabelLayerId);
+
+      mapbox.addLayer(new MapboxLayer({
+        id: 'deckgl-arc',
+        type: ArcLayer,
+        data: [
+          {source: [-122.3998664, 37.7883697], target: [-122.400068, 37.7900503]}
+        ],
+        getSourcePosition: d => d.source,
+        getTargetPosition: d => d.target,
+        getSourceColor: [255, 208, 0],
+        getTargetColor: [0, 128, 255],
+        getStrokeWidth: 8
+      }))
+      
+
+      console.log('waterlevel= '+waterlevel);
+      flood_layer.addTo(leaflet_mapbox);
+      mapbox.setStyle('mapbox://styles/ed3c/ck1rbevhn47t51dpnmogzd5ww');
+
+      document.getElementById('slider').addEventListener('input', function(e) {
+            var input_meters = parseInt(e.target.value, 10);
+           // console.log('remove= '+wasterlevel)
+
+           waterlevel = filterBy(input_meters);
+           document.getElementById('age').textContent = age[waterlevel];
+           //console.log('filterBy= '+waterlevel)
+
+           flood_layer.setUrl('http://flood.firetree.net/solidtile/m_'+waterlevel+'/x_{x}/y_{y}/z_{z}',true).redraw();
+
+      });
+      document.getElementById('listing-group').addEventListener('change', function(e) {
+            var handler = e.target.id;
+            //console.log(handler)
+            if (e.target.checked) {
+                console.log(e.target.checked)
+                var bar = document.getElementById(handler);
+                if(handler=='2015') {
+                    //console.log('2015')
+                    check(2015);
+                    uncheck(2000);
+                    uncheck(1990);
+                    uncheck(1975);
+                    mapbox.setStyle('mapbox://styles/ed3c/ck1rbevhn47t51dpnmogzd5ww');}
+                if(handler=='2000') {
+                    //console.log('2015')
+                    uncheck(2015);
+                    check(2000);
+                    uncheck(1990);
+                    uncheck(1975);
+                    mapbox.setStyle('mapbox://styles/ed3c/ck1rbevhn47t51dpnmogzd5ww');}
+                if(handler=='1990') {
+                    //console.log('2015')
+                    uncheck(2015);
+                    uncheck(2000);
+                    check(1990);
+                    uncheck(1975);
+                    mapbox.setStyle('mapbox://styles/ed3c/ck1y9ogmj2fqs1cn04o7u7x8d');}
+                if(handler=='1975') {
+                    //console.log('1975')
+                    uncheck(2015);
+                    uncheck(2000);
+                    uncheck(1990);
+                    check(1975);
+                    mapbox.setStyle('mapbox://styles/ed3c/ck1y742q0at7a1dml7rc956nh');}
+            } else {
+                console.log(e.target.checked)
+                mapbox.setStyle('mapbox://styles/mapbox/cjaudgl840gn32rnrepcb9b9g');
+            }
+                
+        });
+
+    });
+
+    /*function Run(strPath)
+    {
+        var objShell = new ActiveXObject(“wscript.shell”);
+        objShell.exec(strPath);
+        objShell = null;
+    }*/
+
+    function check(check_id) {
+        document.getElementById(check_id).checked = true;
+    }
+
+    function uncheck(check_id) {
+        document.getElementById(check_id).checked = false;
+    }
+
+    function filterBy(m) {
+
+        var filters = ['==', 'meteor', m];
+        waterlevel = document.getElementById('meteor').textContent = meters[m];
+
+        //console.log('water= '+wasterlevel)
+        return waterlevel;
+    }
+
+    var geojson = {
+        "type": "FeatureCollection",
+        "features": [
+        {
+        "type": "Feature",
+        "properties": {
+        "message": "Foo",
+        "iconSize": [60, 60]
+        },
+        "geometry": {
+        "type": "Point",
+        "coordinates": [
+        120.5644,
+        25.0336
+        ]
+        }
+        },
+        {
+        "type": "Feature",
+        "properties": {
+        "message": "Bar",
+        "iconSize": [50, 50]
+        },
+        "geometry": {
+        "type": "Point",
+        "coordinates": [
+        -61.2158203125,
+        -15.97189158092897
+        ]
+        }
+        },
+        {
+        "type": "Feature",
+        "properties": {
+        "message": "Baz",
+        "iconSize": [40, 40]
+        },
+        "geometry": {
+        "type": "Point",
+        "coordinates": [
+        -63.29223632812499,
+        -18.28151823530889
+        ]
+        }
+        }
+        ]
+    };
+    
+
+    // add markers to map
+    geojson.features.forEach(function(marker) {
+        // create a DOM element for the marker
+        var el = document.createElement('div');
+        el.className = 'marker';
+        el.style.backgroundImage = 'url(https://placekitten.com/g/' + marker.properties.iconSize.join('/') + '/)';
+        el.style.width = marker.properties.iconSize[0] + 'px';
+        el.style.height = marker.properties.iconSize[1] + 'px';
+        
+        el.addEventListener('click', function() {
+        //window.alert(marker.properties.message);
+        //url = "http://www.systutorials.com";
+        url = "D:\\Ddesk\\0930TEST\\WEBGL_unity\\index.html";
+        window.open(url);
+        });
+        
+        // add marker to map
+        new mapboxgl.Marker(el)
+        .setLngLat(marker.geometry.coordinates)
+        .addTo(mapbox);
+    });
+    //mapbox.scrollZoom.disable();
+
+    mapbox.on('rotatestart',  function() { 
+        console.log('rotatestart')
+        document.getElementsByClassName("map-overlay top")[0].style.visibility = "hidden";
+        var element = document.getElementById('map');
+        element.style.opacity = "0";
+        mapbox.setStyle('mapbox://styles/ed3c/ck1rbevhn47t51dpnmogzd5ww');
+        //element.style.filter  = 'alpha(opacity=90)';
+        //var stateDataLayer = mapbox.getLayer('hillshading');
+        //console.log('rotatestart'+mapbox.getStyle()+stateDataLayer); 
+        //mapbox.setPaintProperty('','hillshade-opacity',1);
+        //mapbox.setPaintProperty('chicago', 'raster-opacity', parseInt(e.target.value, 10) / 100);
+    });
+
+    mapbox.on('move', move);
+    //mapbox.on('zoom',  function() { console.log('zoom'); });
+    mapbox.on('zoomend', zoomend);
+    //mapbox.on('moveend', moveend);
+
+    function move() {
+        //console.log('move')
+        var center = mapbox.getCenter();
+        leaflet_mapbox.flyTo(center,mapbox.getZoom()+1,false);
+    
+    }
+    
+    function zoomend() {
+        //console.log('zoomend');
+        var center = mapbox.getCenter();
+        leaflet_mapbox.flyTo(center,mapbox.getZoom()+1,false);
+    }
+
+    /*overlayers.on('load',onMapLoad);
+
+    function onMapLoad(wasterlevel) {
+        console.log('load')
+        flood_layer.addTo(leaflet_mapbox);
+    }*/
+
+    /*function moveend() {
+        console.log('moveend')
+        var center = mapbox.getCenter();
+        leaflet_mapbox.panTo(center);
+    }*/
+
+</script>
+</body>
+</html>
