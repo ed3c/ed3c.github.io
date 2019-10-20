@@ -25,4 +25,13 @@ Leaflet is mobile-friendly interactive maps and land data based on OpenStreetMap
 #### deck.gl
 deck.gl is a WebGL-powered framework for visual exploratory data analysis of large datasets.
 
-## How it works
+## Features
+#### Sea Level control bar
+Predict Sea level rising in decades.
+#### Location Navigator 
+Locate your position automatically.
+#### Population Density List
+Choosing population density each years.
+#### LayerStyle Toggler
+Choosing map render style.
+
