@@ -1,6 +1,6 @@
 # NASA
 ## How to execute
-###　STEP1
+#### STEP1
 OPEN server on localhost
 for python2 user:
 ```
