@@ -13,7 +13,7 @@ python py3_server.py
 ```
 
 #### STEP 2
-Open your browser and click "index.html"
+Open your browser and type "localhost:80" in URL
 and START your journey!
 
 
